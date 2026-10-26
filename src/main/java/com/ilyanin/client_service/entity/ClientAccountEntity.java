@@ -50,6 +50,12 @@ public class ClientAccountEntity {
 
     protected ClientAccountEntity() {}
 
+    void update(String fullName, Gender gender, ClientStatus status) {
+        this.fullName = fullName;
+        this.gender = gender;
+        this.status = status;
+    }
+
     @PrePersist
     void onCreate() {
         var now = OffsetDateTime.now();
@@ -70,24 +76,12 @@ public class ClientAccountEntity {
         return fullName;
     }
 
-    public void setFullName(String fullName) {
-        this.fullName = fullName;
-    }
-
     public Gender getGender() {
         return gender;
     }
 
-    public void setGender(Gender gender) {
-        this.gender = gender;
-    }
-
     public ClientStatus getStatus() {
         return status;
-    }
-
-    public void setStatus(ClientStatus status) {
-        this.status = status;
     }
 
     public OffsetDateTime getCreatedAt() {
