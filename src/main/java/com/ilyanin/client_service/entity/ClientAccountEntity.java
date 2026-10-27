@@ -1,6 +1,8 @@
 package com.ilyanin.client_service.entity;
 
 import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 
 import com.ilyanin.client_service.model.ClientStatus;
 import com.ilyanin.client_service.model.Gender;
@@ -58,14 +60,18 @@ public class ClientAccountEntity {
 
     @PrePersist
     void onCreate() {
-        var now = OffsetDateTime.now();
+        var now = currentTimestamp();
         this.createdAt = now;
         this.updatedAt = now;
     }
 
     @PreUpdate
     void onUpdate() {
-        this.updatedAt = OffsetDateTime.now();
+        this.updatedAt = currentTimestamp();
+    }
+
+    private static OffsetDateTime currentTimestamp() {
+        return OffsetDateTime.now(ZoneOffset.UTC).truncatedTo(ChronoUnit.MICROS);
     }
 
     public Long getId() {
