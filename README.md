@@ -5,13 +5,10 @@ REST-сервис учёта клиентов: создание, чтение, �
 ## Стек
 
 - Java 21
-- Spring Boot 4.1.2 (Web MVC, Data JPA / Hibernate, Validation, Cache, Actuator)
+- Spring Boot 4.1.2 (Web MVC, Data JPA / Hibernate, Validation, Actuator)
 - PostgreSQL 17
 - Flyway — миграции схемы БД
-- Caffeine — локальный кэш
-- springdoc-openapi — OpenAPI-спецификация и Swagger UI
 - Maven, Docker, Docker Compose
-- JUnit 5, MockMvc, Testcontainers
 
 ## Запуск
 
@@ -27,19 +24,18 @@ docker compose up --build
 
 ### Локально (для разработки)
 
-Требуются JDK 21 и Maven.
+Требуются JDK 21.
 
 ```bash
 docker compose up -d db      # только БД
-mvn spring-boot:run          # приложение
+./mvnw spring-boot:run       # приложение
 ```
 
 ### Адреса
 
 | Что | URL |
 |---|---|
-| Swagger UI | http://localhost:8080/swagger-ui.html |
-| OpenAPI (JSON) | http://localhost:8080/v3/api-docs |
+| API | http://localhost:8080/api/clients |
 | Health | http://localhost:8080/actuator/health |
 
 ### Подключение к БД
@@ -48,75 +44,59 @@ mvn spring-boot:run          # приложение
 docker exec -it client-db psql -U client -d client_db
 ```
 
-Параметры: `localhost:5432`, БД `client_db`, пользователь/пароль `client` / `client`.
+Параметры: `localhost:5432`, БД `client_db`, пользователь / пароль `client` / `client`.
 
 ## API
-
-Базовый путь: `/api/clients`. Формат — JSON, дата/время — ISO-8601 в UTC.
 
 | Метод | Путь | Описание | Успех | Ошибки |
 |---|---|---|---|---|
 | POST | `/api/clients` | Создать клиента | 201 + `Location` | 400 |
-| GET | `/api/clients` | Список клиентов | 200 | — |
+| GET | `/api/clients` | Список всех клиентов | 200 | — |
 | GET | `/api/clients/{id}` | Клиент по id | 200 | 400, 404 |
 | PUT | `/api/clients/{id}` | Полная замена данных клиента | 200 | 400, 404 |
 | DELETE | `/api/clients/{id}` | Удалить клиента | 204 | 400, 404 |
 
-Подробная спецификация с моделями и примерами — в Swagger UI.
+Полная спецификация — модели, правила валидации, примеры запросов и ответов, формат ошибок и сценарии проверки: [docs/specification.md](docs/specification.md).
 
-### Модели
+Пример создания клиента:
 
-**Создание** — `fullName` (обязательно, ≤ 255), `gender` (обязательно, `M` | `F`).
-
-**Обновление** — `fullName`, `gender`, `status` (`ACTIVE` | `INACTIVE`), все поля обязательны.
-
-**Ответ** — `id`, `fullName`, `gender`, `status`, `createdAt`, `updatedAt`.
-
-### Ошибки
-
-Ошибки возвращаются в формате [RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) (`application/problem+json`).
-Для ошибок валидации дополнительно передаётся список полей `errors`.
+```bash
+curl -i -X POST http://localhost:8080/api/clients \
+  -H "Content-Type: application/json" \
+  -d '{"fullName": "Иванов Иван Иванович", "gender": "M"}'
+```
 
 ## Принятые решения
 
 - **PUT — полная замена.** Клиент передаёт все изменяемые поля (`fullName`, `gender`, `status`). Это соответствует семантике PUT (RFC 9110) и делает запрос идемпотентным. Поля `id`, `createdAt`, `updatedAt` через API не изменяются.
 - **PUT не создаёт запись.** Если клиента нет — 404 (не upsert).
-- **Статус при создании** всегда `ACTIVE`. Значение `status` в запросе на создание игнорируется.
+- **Статус при создании** всегда `ACTIVE`; значение `status` в запросе на создание игнорируется.
 - **Удаление физическое** (hard delete). Удаление несуществующего клиента — 404.
-- **Список** Пагинации нет — для реальных объёмов её нужно добавить.
+- **Список** возвращает клиентов во всех статусах, без пагинации — как требует задание («список всех клиентов»). Для больших объёмов данных пагинацию нужно добавить.
+- **Ответ содержит все поля клиента.** Служебных или чувствительных данных в таблице нет, а `status` и даты нужны потребителю.
+- **Ошибки** возвращаются в формате RFC 9457 (`ProblemDetail`).
 - **Схема БД управляется Flyway**, Hibernate работает в режиме `validate`.
 - **Генерация id** — `GENERATED ALWAYS AS IDENTITY` в PostgreSQL, `GenerationType.IDENTITY` в JPA.
 - **CHECK-ограничения** на `gender` и `status` в БД дублируют валидацию приложения: данные остаются корректными и при вставке напрямую через SQL.
+- **Даты** выставляются JPA-колбэками `@PrePersist` / `@PreUpdate`. `modify_dttm` обновляется, только если данные клиента действительно изменились.
 - **Время хранится в UTC** (`timestamptz`, `hibernate.jdbc.time_zone=UTC`).
-
-
-### Кэш
-
-Кэшируется только получение клиента по id (Caffeine: до 1000 записей, TTL 10 минут). Обновление кладёт в кэш новое значение, удаление вычищает запись.
-
-Ограничение: кэш локальный, поэтому при нескольких экземплярах сервиса возможны устаревшие данные в пределах TTL. Для горизонтального масштабирования нужен распределённый кэш (например, Redis).
-
-## Тесты
-
-```bash
-mvn verify
-```
-
-Интеграционные тесты используют Testcontainers и требуют запущенного Docker.
+- В модели данных из задания у `modify_dttm` указан тип `timestmp with time zone` — считаю это опечаткой, используется `timestamp with time zone`.
 
 ## Структура проекта
 
 ```
-src/main/java/com/example/clientservice
-├── config/        # конфигурация (OpenAPI, кэш)
-├── controller/    # REST-контроллеры
+src/main/java/com/ilyanin/client_service
+├── controller/    # REST-контроллер
 ├── dto/           # запросы и ответы API
-├── entity/        # JPA-сущности
+├── entity/        # JPA-сущность
 ├── exception/     # исключения и глобальный обработчик ошибок
 ├── mapper/        # преобразование Entity <-> DTO
-├── repository/    # Spring Data JPA репозитории
+├── model/         # перечисления (Gender, ClientStatus)
+├── repository/    # Spring Data JPA репозиторий
 └── service/       # бизнес-логика
 src/main/resources
 ├── application.yml
 └── db/migration/  # миграции Flyway
+docs/
+└── specification.md    # спецификация API
 ```
