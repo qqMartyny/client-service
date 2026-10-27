@@ -50,7 +50,7 @@ public class ClientAccountEntity {
 
     protected ClientAccountEntity() {}
 
-    void update(String fullName, Gender gender, ClientStatus status) {
+    public void update(String fullName, Gender gender, ClientStatus status) {
         this.fullName = fullName;
         this.gender = gender;
         this.status = status;
