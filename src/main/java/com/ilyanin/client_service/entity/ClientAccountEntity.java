@@ -4,6 +4,9 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import com.ilyanin.client_service.model.ClientStatus;
 import com.ilyanin.client_service.model.Gender;
 
@@ -31,6 +34,7 @@ public class ClientAccountEntity {
     private String fullName;
 
     @Enumerated(EnumType.STRING)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     @Column(name = "gender", length = 1)
     private Gender gender;
 
