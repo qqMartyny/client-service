@@ -9,7 +9,7 @@ import com.ilyanin.client_service.entity.ClientAccountEntity;
 @Component 
 public class ClientMapper {
     public ClientAccountEntity toEntity(CreateClientRequest request) {
-        return new ClientAccountEntity(request.fullname(), request.gender());
+        return new ClientAccountEntity(request.fullName(), request.gender());
     }
 
     public ClientResponse toResponse(ClientAccountEntity entity) {
