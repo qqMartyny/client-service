@@ -58,6 +58,8 @@ docker exec -it client-db psql -U client -d client_db
 
 Полная спецификация — модели, правила валидации, примеры запросов и ответов, формат ошибок и сценарии проверки: [docs/specification.md](docs/specification.md).
 
+Коллекция Postman с автопроверками всех сценариев: [docs/client-service.postman_collection.json](docs/client-service.postman_collection.json).
+
 Пример создания клиента:
 
 ```bash

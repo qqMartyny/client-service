@@ -1,0 +1,1112 @@
+{
+  "info": {
+    "_postman_id": "6f0f6a8e-3b1d-4b8e-9a51-2f1c0c5e7a10",
+    "name": "client-service",
+    "description": "Проверка API сервиса учёта клиентов. Спецификация: docs/specification.md.\n\nЗапуск: Run collection. Папки и запросы выполняются по порядку и зависят друг от друга через переменную clientId.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Основной сценарий (CRUD)",
+      "description": "Запросы зависят друг от друга: create сохраняет clientId, остальные его используют. Запускать по порядку.",
+      "item": [
+        {
+          "name": "Создать клиента → 201",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test(\"status = ACTIVE\", () => pm.expect(body.status).to.eql(\"ACTIVE\"));",
+                  "pm.test(\"данные из запроса сохранены\", () => {",
+                  "    pm.expect(body.fullName).to.eql(\"Иванов Иван Иванович\");",
+                  "    pm.expect(body.gender).to.eql(\"M\");",
+                  "});",
+                  "pm.test(\"createdAt = updatedAt\", () => pm.expect(body.createdAt).to.eql(body.updatedAt));",
+                  "pm.test(\"время в UTC\", () => pm.expect(body.createdAt).to.match(/Z$/));",
+                  "pm.test(\"Location ведёт на созданного клиента\", () =>",
+                  "    pm.expect(pm.response.headers.get(\"Location\")).to.match(new RegExp(\"/api/clients/\" + body.id + \"$\")));",
+                  "",
+                  "pm.collectionVariables.set(\"clientId\", body.id);",
+                  "pm.collectionVariables.set(\"createdAt\", body.createdAt);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"fullName\": \"Иванов Иван Иванович\",\n    \"gender\": \"M\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Список клиентов → 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test(\"ответ — массив\", () => pm.expect(body).to.be.an(\"array\"));",
+                  "pm.test(\"созданный клиент есть в списке\", () => {",
+                  "    const id = Number(pm.collectionVariables.get(\"clientId\"));",
+                  "    pm.expect(body.some(c => c.id === id)).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Клиент по id → 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test(\"тот самый клиент\", () =>",
+                  "    pm.expect(body.id).to.eql(Number(pm.collectionVariables.get(\"clientId\"))));",
+                  "pm.test(\"createdAt совпадает с ответом POST\", () =>",
+                  "    pm.expect(body.createdAt).to.eql(pm.collectionVariables.get(\"createdAt\")));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/{{clientId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                "{{clientId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Обновить клиента → 200",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test(\"данные обновились\", () => {",
+                  "    pm.expect(body.fullName).to.eql(\"Иванов Иван Петрович\");",
+                  "    pm.expect(body.status).to.eql(\"INACTIVE\");",
+                  "});",
+                  "pm.test(\"createdAt не изменился\", () =>",
+                  "    pm.expect(body.createdAt).to.eql(pm.collectionVariables.get(\"createdAt\")));",
+                  "pm.test(\"updatedAt изменился\", () => pm.expect(body.updatedAt).to.not.eql(body.createdAt));",
+                  "",
+                  "pm.collectionVariables.set(\"updatedAt\", body.updatedAt);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/{{clientId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                "{{clientId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"fullName\": \"Иванов Иван Петрович\",\n    \"gender\": \"M\",\n    \"status\": \"INACTIVE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Повторный такой же PUT → updatedAt не меняется",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "",
+                  "pm.test(\"updatedAt НЕ изменился\", () =>",
+                  "    pm.expect(pm.response.json().updatedAt).to.eql(pm.collectionVariables.get(\"updatedAt\")));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/{{clientId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                "{{clientId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"fullName\": \"Иванов Иван Петрович\",\n    \"gender\": \"M\",\n    \"status\": \"INACTIVE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "Hibernate не находит изменений (dirty checking), поэтому UPDATE не выполняется и @PreUpdate не срабатывает."
+          }
+        },
+        {
+          "name": "Удалить клиента → 204",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"204 No Content\", () => pm.response.to.have.status(204));",
+                  "",
+                  "pm.test(\"тело пустое\", () => pm.expect(pm.response.text()).to.be.empty);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/{{clientId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                "{{clientId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET удалённого клиента → 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"404 Not Found\", () => pm.response.to.have.status(404));",
+                  "",
+                  "pm.test(\"формат ProblemDetail\", () => {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property(\"status\", pm.response.code);",
+                  "    pm.expect(body).to.have.property(\"detail\");",
+                  "});",
+                  "pm.test(\"detail содержит id клиента\", () =>",
+                  "    pm.expect(pm.response.json().detail).to.include(String(pm.collectionVariables.get(\"clientId\"))));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/{{clientId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                "{{clientId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "Повторный DELETE → 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"404 Not Found\", () => pm.response.to.have.status(404));",
+                  "",
+                  "pm.test(\"формат ProblemDetail\", () => {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property(\"status\", pm.response.code);",
+                  "    pm.expect(body).to.have.property(\"detail\");",
+                  "});",
+                  "pm.test(\"detail содержит id клиента\", () =>",
+                  "    pm.expect(pm.response.json().detail).to.include(String(pm.collectionVariables.get(\"clientId\"))));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/{{clientId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                "{{clientId}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "PUT несуществующего клиента → 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"404 Not Found\", () => pm.response.to.have.status(404));",
+                  "",
+                  "pm.test(\"формат ProblemDetail\", () => {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property(\"status\", pm.response.code);",
+                  "    pm.expect(body).to.have.property(\"detail\");",
+                  "});",
+                  "pm.test(\"detail содержит id клиента\", () =>",
+                  "    pm.expect(pm.response.json().detail).to.include(String(pm.collectionVariables.get(\"clientId\"))));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/{{clientId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                "{{clientId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"fullName\": \"Петров Пётр Петрович\",\n    \"gender\": \"M\",\n    \"status\": \"ACTIVE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "clientId уже удалён, значит клиента с таким id гарантированно нет."
+          }
+        },
+        {
+          "name": "GET после PUT → 404 (PUT не создал запись)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"404 Not Found\", () => pm.response.to.have.status(404));",
+                  "",
+                  "pm.test(\"формат ProblemDetail\", () => {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property(\"status\", pm.response.code);",
+                  "    pm.expect(body).to.have.property(\"detail\");",
+                  "});",
+                  "pm.test(\"detail содержит id клиента\", () =>",
+                  "    pm.expect(pm.response.json().detail).to.include(String(pm.collectionVariables.get(\"clientId\"))));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/{{clientId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                "{{clientId}}"
+              ]
+            },
+            "description": "Проверяем, что PUT не работает как upsert."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Ошибки валидации и формата",
+      "description": "Негативные сценарии: ожидается 400 в формате ProblemDetail.",
+      "item": [
+        {
+          "name": "POST без fullName → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 Bad Request\", () => pm.response.to.have.status(400));",
+                  "",
+                  "pm.test(\"формат ProblemDetail\", () => {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property(\"status\", pm.response.code);",
+                  "    pm.expect(body).to.have.property(\"detail\");",
+                  "});",
+                  "pm.test(\"detail = Validation failed\", () =>",
+                  "    pm.expect(pm.response.json().detail).to.eql(\"Validation failed\"));",
+                  "pm.test(\"ошибка указывает на поле fullName\", () =>",
+                  "    pm.expect(pm.response.json().errors.join(\" \")).to.include(\"fullName\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"gender\": \"M\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "POST с пустым fullName → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 Bad Request\", () => pm.response.to.have.status(400));",
+                  "",
+                  "pm.test(\"формат ProblemDetail\", () => {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property(\"status\", pm.response.code);",
+                  "    pm.expect(body).to.have.property(\"detail\");",
+                  "});",
+                  "pm.test(\"detail = Validation failed\", () =>",
+                  "    pm.expect(pm.response.json().detail).to.eql(\"Validation failed\"));",
+                  "pm.test(\"ошибка указывает на поле fullName\", () =>",
+                  "    pm.expect(pm.response.json().errors.join(\" \")).to.include(\"fullName\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"fullName\": \"\",\n    \"gender\": \"M\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "POST с fullName из пробелов → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 Bad Request\", () => pm.response.to.have.status(400));",
+                  "",
+                  "pm.test(\"формат ProblemDetail\", () => {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property(\"status\", pm.response.code);",
+                  "    pm.expect(body).to.have.property(\"detail\");",
+                  "});",
+                  "pm.test(\"detail = Validation failed\", () =>",
+                  "    pm.expect(pm.response.json().detail).to.eql(\"Validation failed\"));",
+                  "pm.test(\"ошибка указывает на поле fullName\", () =>",
+                  "    pm.expect(pm.response.json().errors.join(\" \")).to.include(\"fullName\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"fullName\": \"   \",\n    \"gender\": \"M\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "POST с fullName длиннее 255 → 400",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set(\"longName\", \"А\".repeat(256));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 Bad Request\", () => pm.response.to.have.status(400));",
+                  "",
+                  "pm.test(\"формат ProblemDetail\", () => {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property(\"status\", pm.response.code);",
+                  "    pm.expect(body).to.have.property(\"detail\");",
+                  "});",
+                  "pm.test(\"detail = Validation failed\", () =>",
+                  "    pm.expect(pm.response.json().detail).to.eql(\"Validation failed\"));",
+                  "pm.test(\"ошибка указывает на поле fullName\", () =>",
+                  "    pm.expect(pm.response.json().errors.join(\" \")).to.include(\"fullName\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"fullName\": \"{{longName}}\",\n    \"gender\": \"M\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "POST с пустым объектом → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 Bad Request\", () => pm.response.to.have.status(400));",
+                  "",
+                  "pm.test(\"формат ProblemDetail\", () => {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property(\"status\", pm.response.code);",
+                  "    pm.expect(body).to.have.property(\"detail\");",
+                  "});",
+                  "pm.test(\"detail = Validation failed\", () =>",
+                  "    pm.expect(pm.response.json().detail).to.eql(\"Validation failed\"));",
+                  "pm.test(\"ошибка указывает на поле fullName\", () =>",
+                  "    pm.expect(pm.response.json().errors.join(\" \")).to.include(\"fullName\"));",
+                  "pm.test(\"ошибка указывает на поле gender\", () =>",
+                  "    pm.expect(pm.response.json().errors.join(\" \")).to.include(\"gender\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "POST с неверным gender → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 Bad Request\", () => pm.response.to.have.status(400));",
+                  "",
+                  "pm.test(\"формат ProblemDetail\", () => {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property(\"status\", pm.response.code);",
+                  "    pm.expect(body).to.have.property(\"detail\");",
+                  "});",
+                  "pm.test(\"detail = Malformed request\", () =>",
+                  "    pm.expect(pm.response.json().detail).to.eql(\"Malformed request\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"fullName\": \"Иванов Иван Иванович\",\n    \"gender\": \"X\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "POST с битым JSON → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 Bad Request\", () => pm.response.to.have.status(400));",
+                  "",
+                  "pm.test(\"формат ProblemDetail\", () => {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property(\"status\", pm.response.code);",
+                  "    pm.expect(body).to.have.property(\"detail\");",
+                  "});",
+                  "pm.test(\"detail = Malformed request\", () =>",
+                  "    pm.expect(pm.response.json().detail).to.eql(\"Malformed request\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"fullName\": \"Иванов Иван Иванович\",\n    \"gender\":\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "GET с нечисловым id → 400",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 Bad Request\", () => pm.response.to.have.status(400));",
+                  "",
+                  "pm.test(\"формат ProblemDetail\", () => {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property(\"status\", pm.response.code);",
+                  "    pm.expect(body).to.have.property(\"detail\");",
+                  "});",
+                  "pm.test(\"detail = Malformed request\", () =>",
+                  "    pm.expect(pm.response.json().detail).to.eql(\"Malformed request\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/abc",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                "abc"
+              ]
+            }
+          }
+        },
+        {
+          "name": "PUT без status → 400 (валидация раньше поиска)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 Bad Request\", () => pm.response.to.have.status(400));",
+                  "",
+                  "pm.test(\"формат ProblemDetail\", () => {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property(\"status\", pm.response.code);",
+                  "    pm.expect(body).to.have.property(\"detail\");",
+                  "});",
+                  "pm.test(\"detail = Validation failed\", () =>",
+                  "    pm.expect(pm.response.json().detail).to.eql(\"Validation failed\"));",
+                  "pm.test(\"ошибка указывает на поле status\", () =>",
+                  "    pm.expect(pm.response.json().errors.join(\" \")).to.include(\"status\"));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/{{clientId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                "{{clientId}}"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"fullName\": \"Иванов Иван Петрович\",\n    \"gender\": \"M\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "description": "clientId уже удалён, но ответ 400, а не 404: тело запроса проверяется до обращения к сервису."
+          }
+        },
+        {
+          "name": "POST с Content-Type text/plain → 415",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"415 Unsupported Media Type\", () => pm.response.to.have.status(415));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "text/plain"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\"fullName\": \"Иванов Иван Иванович\", \"gender\": \"M\"}",
+              "options": {
+                "raw": {
+                  "language": "text"
+                }
+              }
+            },
+            "description": "Обрабатывается стандартным механизмом Spring Boot, поэтому тело не в формате ProblemDetail."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Дополнительные проверки",
+      "description": "",
+      "item": [
+        {
+          "name": "POST с полем status → status игнорируется",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "",
+                  "const body = pm.response.json();",
+                  "",
+                  "pm.test(\"клиент создан со статусом ACTIVE, а не INACTIVE\", () => pm.expect(body.status).to.eql(\"ACTIVE\"));",
+                  "",
+                  "pm.collectionVariables.set(\"tempClientId\", body.id);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"fullName\": \"Сидоров Сидор Сидорович\",\n    \"gender\": \"M\",\n    \"status\": \"INACTIVE\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "Удалить временного клиента → 204",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"204 No Content\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/{{tempClientId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                "{{tempClientId}}"
+              ]
+            },
+            "description": "Уборка после предыдущего запроса."
+          }
+        },
+        {
+          "name": "GET несуществующего id → 404",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"404 Not Found\", () => pm.response.to.have.status(404));",
+                  "",
+                  "pm.test(\"формат ProblemDetail\", () => {",
+                  "    pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"application/problem+json\");",
+                  "    const body = pm.response.json();",
+                  "    pm.expect(body).to.have.property(\"status\", pm.response.code);",
+                  "    pm.expect(body).to.have.property(\"detail\");",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/clients/999999999",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "clients",
+                "999999999"
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "clientId",
+      "value": ""
+    },
+    {
+      "key": "createdAt",
+      "value": ""
+    },
+    {
+      "key": "updatedAt",
+      "value": ""
+    },
+    {
+      "key": "tempClientId",
+      "value": ""
+    },
+    {
+      "key": "longName",
+      "value": ""
+    }
+  ]
+}
